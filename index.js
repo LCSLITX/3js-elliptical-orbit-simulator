@@ -1,8 +1,12 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createLinesGeometry } from './flat_surface_ellipse';
+import { OrbitControls } from 'three/addons/controls/OrbitControls';
+import { FlatSurfaceEllipseScene } from './flat_surface_ellipse';
+import { TransformedEllipseScene } from './transformed_ellipse';
+import { OrbitAroundSphereScene } from './orbit_around_sphere';
+import { keplerianOrbitScene, animateOrbit } from './propagate_keplerian_orbit'
+import { SCENE_BACKGROUND_COLOR } from './utils';
+import { gui } from './debug';
 
-let globalScene = new THREE.Scene();
 
 // RENDERER
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -10,71 +14,94 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 document.body.appendChild(renderer.domElement);
 
+
 // CAMERA CONFIGS
 const frustumSize = 3; // Defines the visible area
 const aspect = window.innerWidth / window.innerHeight;
 
+
 // CAMERA
-const camera = new THREE.OrthographicCamera(
-  // To replicate R's 2D plot, we use an OrthographicCamera
-  frustumSize * aspect / -2,
-  frustumSize * aspect / 2,
-  frustumSize / 2,
-  frustumSize / -2,
-  0.1,
-  100
+const globalCamera = new THREE.OrthographicCamera(
+    frustumSize * aspect / -2,
+    frustumSize * aspect / 2,
+    frustumSize / 2,
+    frustumSize / -2,
+    0.1,
+    100
 );
-camera.position.set(0, 0, 10);
-camera.lookAt(0, 0, 0);
+globalCamera.position.set(5, 5, 10);
+globalCamera.lookAt(0, 0, 0);
+
+
 // CAMERA CONTROLS
-const cameraControls = new OrbitControls(camera, renderer.domElement);
+const cameraControls = new OrbitControls(globalCamera, renderer.domElement);
+cameraControls.minZoom = 0.4;
+cameraControls.maxZoom = 0.8;
 cameraControls.enableDamping = true;
+
 
 // LISTENERS
 const handleResize = () => {
-  camera.left = - frustumSize * aspect / 2;
-  camera.right = frustumSize * aspect / 2;
-  camera.top = frustumSize / 2;
-  camera.bottom = - frustumSize / 2;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
+    globalCamera.left = - frustumSize * aspect / 2;
+    globalCamera.right = frustumSize * aspect / 2;
+    globalCamera.top = frustumSize / 2;
+    globalCamera.bottom = - frustumSize / 2;
+
+    globalCamera.updateProjectionMatrix();
+
+    renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-const handleSceneChange = (event) => {
-  if (event.defaultPrevented) {
-    return; // Do nothing if the event was already processed
-  }
+const handleKeyEvents = (event) => {
+    if (event.defaultPrevented) {
+        return; // Do nothing if the event was already processed
+    }
 
+    switch (event.key.toLowerCase()) {
+        case "p":
+            if (selector > 0) selector--;  
+            break;
 
-  switch (event.key) {
-    case "ArrowLeft":
-      console.log(event.key)
-      break;
+        case "n":
+            if (selector < scenes.length - 1) selector++;  
+            break;
 
-    case "ArrowRight":
-      console.log(event.key)
-      break;
+        case "d":
+            gui.show(gui._hidden)
 
-    default:
-      return;
-  }
+        default:
+            return;
+    }
 
-  event.preventDefault();
+    console.log(selector, event.key)
+
+    event.preventDefault();
 }
 
 window.addEventListener('resize', handleResize);
+window.addEventListener('keydown', handleKeyEvents);
 
-//
-window.addEventListener('keydown', handleSceneChange);
+
+// SCENES
+let globalScene = new THREE.Scene();
+const scenes = [ FlatSurfaceEllipseScene, TransformedEllipseScene, OrbitAroundSphereScene, keplerianOrbitScene ]
+let selector = 0;
 
 
 function animate() {
-  globalScene.clear();
-  globalScene = createLinesGeometry();
-  cameraControls.update();
-  renderer.render(globalScene, camera);
-  window.requestAnimationFrame(animate);
-}
+    globalScene.clear();
+  
+    globalScene.background = SCENE_BACKGROUND_COLOR;
 
+    globalScene = scenes[selector]();
+
+    if (selector === 3) {
+        animateOrbit();
+    }
+
+    cameraControls.update();
+    renderer.render(globalScene, globalCamera);
+    window.requestAnimationFrame(animate);
+}
 
 animate();
